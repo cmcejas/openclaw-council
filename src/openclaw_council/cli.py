@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
-import subprocess
 import sys
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -12,6 +10,14 @@ from pathlib import Path
 from typing import Iterable
 
 from . import __version__
+from .openclaw_runtime import (
+    OpenClawGatewayConfig,
+    build_openclaw_plan,
+    invoke_tool_http,
+    render_agent_cli_command,
+    render_orchestrator_prompt,
+    run_agent_cli,
+)
 
 
 ROLE_LIBRARY = {
@@ -253,6 +259,8 @@ def write_outputs(state: CouncilState, output_dir: Path) -> tuple[Path, Path]:
 
 
 def run_agent_command(command_template: str, prompt: str, workdir: Path) -> str:
+    import subprocess
+
     command = command_template.replace("{prompt}", prompt)
     result = subprocess.run(
         command,
@@ -453,6 +461,13 @@ def validate_run_args(args: argparse.Namespace) -> None:
         raise SystemExit("--agent-command must include the literal placeholder {prompt}.")
 
 
+def validate_openclaw_plan_args(args: argparse.Namespace) -> None:
+    if args.mode == "standard" and args.rounds < 1:
+        raise SystemExit("--rounds must be at least 1 in standard mode.")
+    if args.mode in {"live", "research"} and args.exchanges < 1:
+        raise SystemExit("--exchanges must be at least 1 in live or research mode.")
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="OpenClaw-friendly council scaffolder and transcript runner")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -481,6 +496,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     render = sub.add_parser("render", help="Render markdown transcript from a state file")
     render.add_argument("state_file")
     render.add_argument("--output", default="-")
+
+    plan_openclaw = sub.add_parser("plan-openclaw", help="Generate an OpenClaw-native orchestration pack")
+    plan_openclaw.add_argument("topic")
+    plan_openclaw.add_argument("--mode", choices=["standard", "live", "research"], default="standard")
+    plan_openclaw.add_argument("--directory", default=".")
+    plan_openclaw.add_argument("--rounds", type=int, default=5)
+    plan_openclaw.add_argument("--exchanges", type=int, default=10)
+    plan_openclaw.add_argument("--output-dir", default="council-openclaw")
+    plan_openclaw.add_argument("--gateway-url", help="Gateway base URL for /tools/invoke probing")
+    plan_openclaw.add_argument("--gateway-token", help="Gateway token for /tools/invoke probing")
+    plan_openclaw.add_argument("--gateway-password", help="Gateway password for /tools/invoke probing")
+    plan_openclaw.add_argument("--session-key", default="main", help="Session key used for gateway tool probes")
+    plan_openclaw.add_argument("--probe-session-tools", action="store_true", help="Attempt direct HTTP probes for sessions_list, sessions_send, and sessions_spawn")
+    plan_openclaw.add_argument("--run-via-agent", action="store_true", help="Send the generated orchestrator prompt to `openclaw agent`")
+    plan_openclaw.add_argument("--openclaw-agent-id", help="Target agent id for `openclaw agent`")
+    plan_openclaw.add_argument("--openclaw-session-id", help="Target session id for `openclaw agent`")
+    plan_openclaw.add_argument("--timeout", type=int, default=600, help="Timeout for `openclaw agent` when --run-via-agent is used")
 
     sub.add_parser("version", help="Print version")
     return parser.parse_args(argv)
@@ -528,6 +560,68 @@ def main(argv: list[str] | None = None) -> int:
         else:
             Path(args.output).write_text(output, encoding="utf-8")
             print(args.output)
+        return 0
+
+    if args.command == "plan-openclaw":
+        validate_openclaw_plan_args(args)
+        output_dir = Path(args.output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        config = OpenClawGatewayConfig.from_env()
+        if args.gateway_url:
+            config.url = args.gateway_url
+        if args.gateway_token:
+            config.token = args.gateway_token
+        if args.gateway_password:
+            config.password = args.gateway_password
+        config.session_key = args.session_key
+
+        attempts = []
+        if args.probe_session_tools:
+            attempts.append(invoke_tool_http(config, "sessions_list", {}, action="json"))
+            attempts.append(invoke_tool_http(config, "sessions_send", {"sessionKey": "main", "message": "openclaw-council probe", "timeoutSeconds": 0}))
+            attempts.append(invoke_tool_http(config, "sessions_spawn", {"task": "Reply with exactly OPENCLAW-COUNCIL-PROBE", "mode": "run", "label": "openclaw-council probe"}))
+
+        plan = build_openclaw_plan(args.topic, args.mode, Path(args.directory), args.rounds, args.exchanges, attempts)
+        prompt = render_orchestrator_prompt(plan)
+
+        plan_path = output_dir / "openclaw-plan.json"
+        prompt_path = output_dir / "orchestrator-prompt.md"
+        command_path = output_dir / "run-via-openclaw-agent.sh"
+        plan_path.write_text(plan.to_json(), encoding="utf-8")
+        prompt_path.write_text(prompt, encoding="utf-8")
+        command_path.write_text(
+            "#!/usr/bin/env bash\nset -euo pipefail\n"
+            + render_agent_cli_command(prompt_path, agent_id=args.openclaw_agent_id, session_id=args.openclaw_session_id, timeout=args.timeout)
+            + "\n",
+            encoding="utf-8",
+        )
+        command_path.chmod(0o755)
+
+        print(f"plan: {plan_path}")
+        print(f"prompt: {prompt_path}")
+        print(f"command: {command_path}")
+        print(f"probes: {len(attempts)}")
+
+        if args.run_via_agent:
+            result = run_agent_cli(prompt, agent_id=args.openclaw_agent_id, session_id=args.openclaw_session_id, timeout=args.timeout)
+            response_path = output_dir / "openclaw-agent-response.json"
+            response_path.write_text(
+                json.dumps(
+                    {
+                        "returncode": result.returncode,
+                        "stdout": result.stdout,
+                        "stderr": result.stderr,
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            print(f"agent_response: {response_path}")
+            if result.returncode != 0:
+                print(result.stderr.strip() or result.stdout.strip(), file=sys.stderr)
+                return result.returncode
         return 0
 
     return 1

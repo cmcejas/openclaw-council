@@ -21,6 +21,7 @@ Use this as a thinking pattern, not rigid theater. If two roles are enough, keep
    - `sessions_spawn` for separate agent threads or detached tasks
    - `sessions_send` for alternating turns
    - subagents when the council should stay inside one parent task
+   - if this repo is installed locally, `openclaw-council plan-openclaw ...` can generate an orchestration pack plus a ready-to-run `openclaw agent` wrapper
 4. After every turn, persist the content to a transcript file or structured state.
 5. At the end, run a moderator pass that separates:
    - consensus
@@ -107,18 +108,20 @@ Capture:
 
 ## Local companion CLI
 
-If this repo is available locally, you can use the bundled CLI for scaffolding and transcript management:
+If this repo is available locally, you can use the bundled CLI for scaffolding, transcript management, and OpenClaw-native orchestration prep:
 
 ```bash
 openclaw-council run "Should we split the monolith?" --mode standard --rounds 4 --output-dir council-output
 openclaw-council resume council-output/state.json --speaker "Agent Alpha" --role alpha --phase deliberation --round 1 --content-file alpha.md
 openclaw-council render council-output/state.json
+openclaw-council plan-openclaw "Should we split the monolith?" --mode research --probe-session-tools --output-dir council-openclaw
 ```
 
 ## Honest limitations
 
 This skill does not itself guarantee:
-- automatic OpenClaw daemon integration
+- automatic OpenClaw daemon integration in every deployment path
+- direct `/tools/invoke` access to `sessions_spawn` or `sessions_send` when gateway policy blocks them
 - true concurrent sessions
 - hidden session-memory replay
 - autonomous research without available search/fetch tools

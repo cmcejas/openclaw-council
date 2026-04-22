@@ -21,6 +21,9 @@ It also supports:
 - transcript and state output, with prompt versus response entries called out explicitly
 - manual resume by appending additional entries
 - optional agent execution through a shell command template
+- an OpenClaw-focused orchestration pack generator for real `sessions_spawn` / `sessions_send` workflows
+- optional `openclaw agent` handoff so a live OpenClaw agent can execute the generated council plan
+- optional gateway `/tools/invoke` probing to verify which session primitives are actually callable from a local helper
 - role-aware prompt scaffolding for Alpha, Beta, Researcher, and Moderator
 - OpenClaw skill instructions for running the workflow inside OpenClaw
 
@@ -45,14 +48,16 @@ So this repo adapts the **workflow pattern**, not the exact runtime mechanism.
 - manual resume/append flow
 - prompt scaffolding for Alpha, Beta, Researcher, and Moderator roles
 - optional `--agent-command` hook for local orchestration via an external shell command
+- `plan-openclaw` command that emits a machine-readable council plan, an OpenClaw orchestrator prompt, and a runnable `openclaw agent` wrapper script
+- optional direct gateway probing for `sessions_list`, `sessions_send`, and `sessions_spawn`, with honest capture of policy/runtime failures
 - OpenClaw `SKILL.md`
 - architecture docs and example outputs
 
 ### Not implemented
 
-- direct OpenClaw API integration for `sessions_spawn` / `sessions_send`
-- automatic multi-session lifecycle management against a live OpenClaw daemon
-- true concurrent agent execution
+- guaranteed direct invocation of `sessions_spawn` / `sessions_send` from the local helper in every deployment, because `/tools/invoke` blocks them by default unless the gateway is explicitly configured to allow them
+- automatic multi-session lifecycle management against a live OpenClaw daemon without an actual OpenClaw agent or a gateway that exposes those session tools to the helper path
+- true concurrent agent execution inside this Python process
 - built-in web retrieval stack inside the CLI itself
 - guaranteed replay of hidden model state from a prior session
 
@@ -124,6 +129,40 @@ Notes:
 - The command is executed with `shell=True`.
 - This is intentionally generic. The repo does **not** pretend to know your local OpenClaw or agent wrapper syntax.
 
+## OpenClaw-native orchestration pack
+
+The new `plan-openclaw` command adds a practical wrapper layer for real OpenClaw environments.
+
+It generates:
+- `openclaw-plan.json`: machine-readable turn sequence and transport notes
+- `orchestrator-prompt.md`: a ready-to-send prompt that tells a live OpenClaw agent to use `sessions_spawn` / `sessions_send` when available, and to fall back honestly when they are not
+- `run-via-openclaw-agent.sh`: a shell wrapper that sends the prompt through `openclaw agent`
+
+Example:
+
+```bash
+openclaw-council plan-openclaw "Should we split the monolith?" \
+  --mode research \
+  --directory . \
+  --output-dir out/openclaw-council \
+  --probe-session-tools
+```
+
+If you also want to dispatch the orchestrator prompt immediately:
+
+```bash
+openclaw-council plan-openclaw "Should we split the monolith?" \
+  --mode standard \
+  --output-dir out/openclaw-council \
+  --run-via-agent \
+  --openclaw-agent-id main
+```
+
+Important boundaries:
+- Gateway `/tools/invoke` blocks `sessions_send` and `sessions_spawn` by default in stock OpenClaw. This repo probes and reports that honestly instead of pretending it has private control-plane access.
+- The practical path from a local helper is usually: generate the orchestration pack, then hand it to a live OpenClaw agent via `openclaw agent` so that agent can call session tools from inside its own runtime.
+- When neither path is available, the fallback remains transcript-first orchestration.
+
 ## OpenClaw usage model
 
 Inside OpenClaw, the preferred pattern is usually:
@@ -144,6 +183,7 @@ The included `SKILL.md` tells another OpenClaw agent how to do that carefully an
 openclaw-council run TOPIC [--mode standard|live|research] [--rounds N] [--exchanges N] [--output-dir DIR]
 openclaw-council resume STATE.json --speaker NAME --role ROLE --phase PHASE --round N [--content-file FILE] [--source URL]
 openclaw-council render STATE.json [--output FILE]
+openclaw-council plan-openclaw TOPIC [--mode standard|live|research] [--rounds N] [--exchanges N] [--probe-session-tools] [--run-via-agent]
 openclaw-council version
 ```
 
@@ -190,12 +230,15 @@ Short version:
 - manual resume flow
 - role-aware prompt scaffolding
 - optional generic external runner hook
+- OpenClaw orchestration-pack generator with explicit `sessions_spawn` / `sessions_send` integration paths
+- optional gateway probing for session-tool reachability
+- optional `openclaw agent` handoff wrapper
 - OpenClaw skill guidance
 - checked-in example outputs
 
 ### Conceptual or future
-- native OpenClaw transport against real session APIs
-- automatic multi-session orchestration
+- a universally reliable native OpenClaw transport that can bypass gateway policy limits without a live agent in the middle
+- automatic multi-session orchestration with progress tracking against live spawned sessions
 - built-in web retrieval and citations in the CLI
 - true hidden-state continuation comparable to Claude Code `--continue`
 
@@ -206,8 +249,8 @@ Short version:
 This repo is a **usable first implementation**, not a full OpenClaw daemon integration.
 
 It does not currently:
-- call a real OpenClaw control API
-- spawn real OpenClaw sessions by itself
+- bypass default gateway security policy to force `sessions_spawn` or `sessions_send` over `/tools/invoke`
+- guarantee that a local helper can directly spawn real OpenClaw sessions in every deployment
 - perform autonomous research internally
 - guarantee parity with `council-cli`'s exact persistent-session behavior
 
@@ -215,7 +258,8 @@ What it does provide is:
 - a clean council data model
 - a practical transcript workflow
 - a real skill file
-- a local CLI that is useful immediately for scaffolding, manual orchestration, and record-keeping
+- a local CLI that is useful immediately for scaffolding, manual orchestration, record-keeping, and OpenClaw-specific orchestration handoff
+- direct probing of what a local OpenClaw gateway really allows
 - a clear path for future daemon-backed automation
 
 ## Example output

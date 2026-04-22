@@ -133,7 +133,20 @@ This is intentionally generic. It avoids pretending that this repo knows the uni
 
 That hook exists so teams can wire in their own wrappers locally.
 
-## 5. Transcript-first resume
+## 5. OpenClaw-native orchestration pack
+
+The repo now also includes an `openclaw_runtime` helper layer used by `plan-openclaw`.
+
+That layer does three practical things:
+- builds a machine-readable council turn sequence for `standard`, `live`, and `research` modes
+- probes Gateway `/tools/invoke` honestly so the repo can tell whether `sessions_list`, `sessions_send`, or `sessions_spawn` are actually callable from a local helper path
+- generates an orchestrator prompt plus `openclaw agent` wrapper script for the common real-world path where a live OpenClaw agent, not the Python helper itself, is the component that can call session tools
+
+This is a deliberate compromise:
+- direct HTTP tool invocation is the closest thing to a local control-plane helper, but stock OpenClaw blocks `sessions_send` and `sessions_spawn` there by default for safety
+- `openclaw agent` is a real supported CLI path, so the helper can hand off orchestration to a live agent without pretending it owns private daemon APIs
+
+## 6. Transcript-first resume
 
 Instead of relying on hidden session memory, this repo treats `state.json` as canonical.
 
@@ -145,7 +158,7 @@ This is less elegant than true persistent agent memory, but more:
 - testable
 - OpenClaw-friendly
 
-## 6. Skill plus CLI, not CLI alone
+## 7. Skill plus CLI, not CLI alone
 
 The repo includes `SKILL.md` because in OpenClaw the operational behavior often lives partly in the skill and partly in the helper code.
 
@@ -170,9 +183,12 @@ Practical now:
 - use the skill to run councils manually inside OpenClaw
 - append real turns from subagents or external runners
 - generate reviewable markdown artifacts
+- generate an OpenClaw orchestration pack that explicitly targets `sessions_spawn` / `sessions_send`
+- verify, via live Gateway probe, whether those session primitives are callable from a local helper in the current deployment
+- hand the orchestration prompt to a real OpenClaw agent through `openclaw agent`
 
 Conceptual or future work:
-- native OpenClaw daemon transport
+- native OpenClaw daemon transport with first-class spawned-session lifecycle management inside this Python process
 - automatic turn routing across spawned sessions
 - resumable detached councils with taskflow integration
 - richer research source ingestion
