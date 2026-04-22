@@ -207,19 +207,24 @@ def save_state(state: CouncilState, path: Path) -> None:
     path.write_text(state.to_json() + "\n", encoding="utf-8")
 
 
+def escape_markdown_table_cell(value: object) -> str:
+    text = str(value)
+    return text.replace("\\", "\\\\").replace("|", "\\|").replace("\n", "<br>")
+
+
 def render_markdown(state: CouncilState) -> str:
     lines = [
         "# OpenClaw Council Transcript",
         "",
         "| Field | Value |",
         "|---|---|",
-        f"| Topic | {state.topic} |",
-        f"| Mode | {state.mode} |",
-        f"| Directory | {state.directory} |",
-        f"| Started | {state.started_at} |",
-        f"| Updated | {state.updated_at} |",
-        f"| Planned rounds | {state.rounds_planned} |",
-        f"| Planned exchanges | {state.exchanges_planned} |",
+        f"| Topic | {escape_markdown_table_cell(state.topic)} |",
+        f"| Mode | {escape_markdown_table_cell(state.mode)} |",
+        f"| Directory | {escape_markdown_table_cell(state.directory)} |",
+        f"| Started | {escape_markdown_table_cell(state.started_at)} |",
+        f"| Updated | {escape_markdown_table_cell(state.updated_at)} |",
+        f"| Planned rounds | {escape_markdown_table_cell(state.rounds_planned)} |",
+        f"| Planned exchanges | {escape_markdown_table_cell(state.exchanges_planned)} |",
         "",
     ]
 

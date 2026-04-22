@@ -81,6 +81,14 @@ source .venv/bin/activate
 pip install -e .
 ```
 
+## Test
+
+The repo ships stdlib `unittest` coverage, so you can validate it without installing `pytest` first:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
 ## Quick start
 
 ### 1. Scaffold a standard council run

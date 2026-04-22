@@ -16,6 +16,7 @@ This file separates what is implemented now from what is intentionally left conc
 - `run`, `resume`, `render`, `plan-openclaw`, and `version` commands
 - JSON state persistence in `state.json`
 - markdown transcript rendering in `transcript.md`
+- summary-table escaping for characters like `|` and embedded newlines so prompts do not corrupt the transcript header
 - argument validation for common misuse
 - optional generic `--agent-command` execution hook
 - OpenClaw orchestration-pack generation (`openclaw-plan.json`, orchestrator prompt, runnable `openclaw agent` wrapper script)

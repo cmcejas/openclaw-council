@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openclaw-council"
-version = "0.2.0"
+version = "0.2.1"
 description = "OpenClaw-friendly multi-agent council orchestration with transcripts, resume, and synthesis."
 readme = "README.md"
 requires-python = ">=3.10"
