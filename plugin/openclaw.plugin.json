@@ -1,0 +1,9 @@
+{
+  "id": "openclaw-council",
+  "name": "OpenClaw Council",
+  "description": "Registers the council_run agent tool for transcript-style council workflows.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false
+  }
+}

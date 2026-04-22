@@ -1,0 +1,21 @@
+{
+  "name": "openclaw-council-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Native OpenClaw plugin: council_run (openclaw-council)",
+  "openclaw": {
+    "extensions": ["./src/index.ts"],
+    "compat": {
+      "pluginApi": ">=2026.3.24-beta.2",
+      "minGatewayVersion": "2026.3.24-beta.2"
+    }
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.3.24-beta.2"
+  },
+  "devDependencies": {
+    "@sinclair/typebox": "^0.34.0",
+    "typescript": "^5.7.0"
+  }
+}

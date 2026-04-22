@@ -40,6 +40,13 @@ Implemented as scaffold generation, a generic shell command hook, and an OpenCla
 ### Research mode
 Implemented as workflow structure and transcript shape. It does not include built-in web search execution inside the CLI.
 
+## Native OpenClaw plugin (in repo)
+
+- **Shipped:** `plugin/` — manifest id `openclaw-council`, tool `council_run` (optional tool; subagent-based MVP).
+- **Verified in this repo:** packaging layout matches OpenClaw’s plugin + manifest expectations; TypeScript entry uses `definePluginEntry` and `api.runtime.subagent` per SDK docs.
+- **Not proven in CI:** loading inside a live OpenClaw install or end-to-end tool execution (depends on host OpenClaw version, gateway, and **tool policy** — see `docs/openclaw-plugin-tool-catalog.md`).
+- **Common blocker:** an exclusive `tools.allow` that includes `group:openclaw` but omits the plugin id or `council_run`, or optional tools not allowlisted.
+
 ## Conceptual / future work
 
 - native transport for `sessions_spawn` and `sessions_send` that does not depend on a live OpenClaw agent handoff or custom gateway policy changes

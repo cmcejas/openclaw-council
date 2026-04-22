@@ -250,6 +250,10 @@ Short version:
 - built-in web retrieval and citations in the CLI
 - true hidden-state continuation comparable to Claude Code `--continue`
 
+### Native plugin (experimental)
+
+- A real OpenClaw plugin skeleton lives under `plugin/` (`council_run`). It is intended to load as other OpenClaw plugins do; **tool execution is environment-dependent** and requires correct **tool allowlisting** (optional tools and `group:openclaw` do not include plugin tools by default). See `docs/openclaw-plugin-tool-catalog.md` before claiming “works end-to-end.”
+
 ## Limitations
 
 ### Important
