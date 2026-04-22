@@ -18,7 +18,7 @@ When the **openclaw-council** plugin is loaded and `council_run` is allowed for 
 
 ## Requirements
 
-Plugin tools must appear in the effective tool policy. If `council_run` is missing from the runtime catalog, fix OpenClaw config (see repo `docs/openclaw-plugin-tool-catalog.md`).
+Plugin tools must survive OpenClaw’s tool **policy** layer. With `tools.profile: "coding"`, add **`council_run`** via **`tools.alsoAllow`** (additive), not only `tools.allow`. See repo `docs/openclaw-plugin-tool-catalog.md`.
 
 ## Fallback
 

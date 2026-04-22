@@ -45,7 +45,7 @@ Implemented as workflow structure and transcript shape. It does not include buil
 - **Shipped:** `plugin/` — manifest id `openclaw-council`, tool `council_run` (optional tool; subagent-based MVP).
 - **Verified in this repo:** packaging layout matches OpenClaw’s plugin + manifest expectations; TypeScript entry uses `definePluginEntry` and `api.runtime.subagent` per SDK docs.
 - **Not proven in CI:** loading inside a live OpenClaw install or end-to-end tool execution (depends on host OpenClaw version, gateway, and **tool policy** — see `docs/openclaw-plugin-tool-catalog.md`).
-- **Common blocker:** an exclusive `tools.allow` that includes `group:openclaw` but omits the plugin id or `council_run`, or optional tools not allowlisted.
+- **Common blocker:** with `tools.profile: "coding"`, plugin tools can be **filtered out post-policy** unless listed under **`tools.alsoAllow`** (e.g. `council_run`). Exclusive `tools.allow` alone often does not fix this; see `docs/openclaw-plugin-tool-catalog.md`.
 
 ## Conceptual / future work
 

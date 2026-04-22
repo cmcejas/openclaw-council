@@ -1,114 +1,83 @@
 # OpenClaw plugin tools and empty tool catalogs
 
-This note explains why the **openclaw-council** native plugin can show as loaded while the agent still sees **no tools** (or no `council_run`), and how to fix it. It aligns with current OpenClaw documentation on tool policy and plugin registration.
+This note explains why the **openclaw-council** native plugin can show as loaded while the agent still sees **no** `council_run`, and how to fix it.
+
+## Primary fix: use `tools.alsoAllow` with `profile: "coding"`
+
+If you use **`tools.profile: "coding"`**, OpenClaw’s policy pipeline can **drop plugin-registered tools** after they are built (they appear in plugin inspect / `createOpenClawTools`, then disappear **post-policy**). Community traces match this: plugin tools present pre-policy, **gone** post-policy, with `coding` profile.
+
+**Fix:** add plugin tool names **additively** with **`tools.alsoAllow`**, not only `tools.allow`.
+
+1. Remove any restrictive `tools.allow` if you were experimenting (or ensure you are not combining conflicting modes — see OpenClaw docs for whether `allow` and `alsoAllow` can coexist in your version).
+
+2. Set something equivalent to:
+
+```json5
+{
+  tools: {
+    profile: "coding",
+    alsoAllow: ["council_run"],
+  },
+}
+```
+
+3. Restart the gateway, then verify `systemPromptReport.tools.entries` includes **`council_run`**.
+
+**CLI example:**
+
+```bash
+openclaw config unset tools.allow
+openclaw config set tools.alsoAllow '["council_run"]'
+openclaw gateway restart
+```
+
+Adjust the `set` command to match your OpenClaw CLI if the key path differs.
+
+**References:** [openclaw/openclaw#47683](https://github.com/openclaw/openclaw/issues/47683) (discussion and `alsoAllow` workaround in comments), [openclaw/openclaw#50328](https://github.com/openclaw/openclaw/issues/50328) (plugin tools vs agent list).
 
 ## Symptoms
 
 - `openclaw plugins inspect openclaw-council` shows the plugin loaded and lists `council_run`.
-- `openclaw agent --json --agent main ...` metadata reports an empty tool list, or the model says `council_run` is unavailable.
+- `openclaw agent --json --agent main ...` metadata has **no** `council_run` in `systemPromptReport.tools.entries`.
 
-Those can both be true: inspection reflects registration; the **agent turn** applies **tool policy** on top.
+Inspection reflects registration; the **agent turn** applies **tool policy** after tool resolution.
 
-## 1. Non-empty `tools.allow` is exclusive
+## `tools.allow` is exclusive (different from `alsoAllow`)
 
-OpenClaw’s tool policy treats a **non-empty** `tools.allow` as: *only* what is listed (after group expansion) remains; everything else is blocked.
+A **non-empty** `tools.allow` means: *only* what is listed (after group expansion) remains; everything else is blocked.
 
-So a config like:
+Examples that bite:
 
-```json5
-{
-  tools: { allow: ["group:openclaw"] },
-}
-```
+- `allow: ["openclaw-council"]` only → often **zero** tools (plugin id may not expand the way you expect, and you excluded all builtins).
+- `allow: ["group:openclaw", "council_run"]` → builtins from the group may appear, but **`council_run` can still be missing** if the **profile** strips plugin tools **unless** they are carried by **`alsoAllow`** (see §Primary fix).
 
-includes **built-in** tools only. The `group:openclaw` group **explicitly excludes plugin tools**. Plugin tools will **not** appear unless you also allow them.
+For **additive** “keep coding defaults + enable plugin tools”, prefer **`alsoAllow`**.
 
-**Fix:** Add either the **plugin manifest id** or the **tool name** (see §3). For example:
+## Manifest `id`
 
-```json5
-{
-  tools: {
-    allow: ["group:openclaw", "openclaw-council"],
-  },
-}
-```
+This repo uses plugin id **`openclaw-council`** in `openclaw.plugin.json` and `definePluginEntry`. The callable tool name is **`council_run`**.
 
-or:
+## Per-agent overrides
 
-```json5
-{
-  tools: {
-    allow: ["group:openclaw", "council_run"],
-  },
-}
-```
+`agents.list[].tools.*` can further restrict tools. Check the **main** agent entry for `tools.profile`, `tools.allow`, `tools.alsoAllow`, and `tools.deny`.
 
-(`deny` still wins over `allow` if both apply.)
+## CLI vs gateway / `--local`
 
-## 2. Optional plugin tools need an allowlist entry
+`openclaw agent` can run via the gateway or embedded. See [`openclaw agent` CLI](https://docs.openclaw.ai/cli/agent). Compare with `--local` if connect/timeouts confuse results.
 
-In this repo, `council_run` is registered with `{ optional: true }` so operators can opt in explicitly (recommended for tools with side effects such as subagent runs).
-
-Per OpenClaw’s plugin docs, optional tools must be enabled via `tools.allow` using either:
-
-- the **tool name** (`council_run`), or
-- the **plugin id** from `openclaw.plugin.json` / `definePluginEntry` (here: **`openclaw-council`**), which can enable all tools from that plugin.
-
-If optional tools are not allowlisted, they are omitted from the model-facing catalog even when the plugin loads.
-
-## 3. Manifest `id` must match what you allowlist
-
-The plugin id in code and manifest must be consistent. This repo uses **`openclaw-council`** everywhere.
-
-If your config uses a different string (for example the npm package name only), allowlisting may not match and the tool stays blocked.
-
-## 4. Per-agent overrides
-
-`agents.list[].tools.*` can further restrict tools. Check the **main** agent entry for:
-
-- `tools.profile` (e.g. `minimal` is extremely small)
-- `tools.allow` / `tools.deny`
-- `tools.subagents.*` if subagent runs are restricted
-
-Precedence is documented under [Multi-Agent Sandbox & Tools](https://docs.openclaw.ai/tools/multi-agent-sandbox-tools).
-
-## 5. CLI vs gateway / `--local`
-
-`openclaw agent` can run via the gateway or embedded. From the CLI docs:
-
-- **`--local`** forces embedded execution after plugin registry preload.
-- Without it, behavior depends on gateway connectivity and fallback.
-
-If you suspect a path mismatch, compare:
-
-```bash
-openclaw agent --local --json --timeout 60000 --agent main --message "List tools you can call."
-```
-
-against the non-`--local` invocation.
-
-## 6. Inspect effective policy
-
-Use:
+## Inspect effective policy
 
 ```bash
 openclaw sandbox explain --agent main --json
 ```
 
-Review effective allow/deny and sandbox tool policy for the agent you are testing.
+## After `council_run` appears: runtime failures
 
-## 7. After `council_run` appears: runtime failures
-
-If the tool is listed but calls fail, check:
-
-- Subagent permissions (`tools.subagents` / sandbox policy).
-- Gateway logs for subagent or policy errors.
-- Model override opt-in if the plugin ever passes custom `provider` / `model` to `subagent.run` (this repo does not, by default).
+If the tool is listed but calls fail, check subagent policy (`tools.subagents`), sandbox settings, and gateway logs.
 
 ## References
 
-- [Tools and Plugins](https://docs.openclaw.ai/tools) — profiles, groups, `group:openclaw` excludes plugins.
-- [Sandbox vs Tool Policy](https://docs.openclaw.ai/gateway/sandbox-vs-tool-policy-vs-elevated) — “If `allow` is non-empty, everything else is treated as blocked.”
-- [Building Plugins / Agent tools](https://docs.openclaw.ai/plugins/agent-tools) — optional tools and `tools.allow`.
+- [Tools and Plugins](https://docs.openclaw.ai/tools) — profiles, groups.
+- [Sandbox vs Tool Policy](https://docs.openclaw.ai/gateway/sandbox-vs-tool-policy-vs-elevated).
+- [Building Plugins / Agent tools](https://docs.openclaw.ai/plugins/agent-tools).
 - [Plugin Runtime Helpers](https://docs.openclaw.ai/plugins/sdk-runtime) — `api.runtime.subagent`.
-- [`openclaw agent` CLI](https://docs.openclaw.ai/cli/agent) — `--local`, plugin preload.

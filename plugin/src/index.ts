@@ -145,7 +145,6 @@ export default definePluginEntry({
           }
         },
       },
-      { optional: true },
     );
   },
 });

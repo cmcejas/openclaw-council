@@ -252,7 +252,7 @@ Short version:
 
 ### Native plugin (experimental)
 
-- A real OpenClaw plugin skeleton lives under `plugin/` (`council_run`). It is intended to load as other OpenClaw plugins do; **tool execution is environment-dependent** and requires correct **tool allowlisting** (optional tools and `group:openclaw` do not include plugin tools by default). See `docs/openclaw-plugin-tool-catalog.md` before claiming “works end-to-end.”
+- A real OpenClaw plugin skeleton lives under `plugin/` (`council_run`). With **`tools.profile: "coding"`**, add **`council_run`** under **`tools.alsoAllow`** so policy does not strip it (see `docs/openclaw-plugin-tool-catalog.md` and upstream discussion in [openclaw#47683](https://github.com/openclaw/openclaw/issues/47683)).
 
 ## Limitations
 
