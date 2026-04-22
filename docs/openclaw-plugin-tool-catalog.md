@@ -71,6 +71,10 @@ This repo uses plugin id **`openclaw-council`** in `openclaw.plugin.json` and `d
 openclaw sandbox explain --agent main --json
 ```
 
+## Plugin loads from source: no extra `npm install` required
+
+This repo’s `plugin/src/index.ts` uses **inline JSON Schema** for `parameters` so OpenClaw does not need `@sinclair/typebox` (or any `plugin/node_modules`) when loading the linked `.ts` entry. If you fork the plugin and add npm dependencies, run `npm install` inside `plugin/` so the gateway can resolve them.
+
 ## After `council_run` appears: runtime failures
 
 If the tool is listed but calls fail, check subagent policy (`tools.subagents`), sandbox settings, and gateway logs.

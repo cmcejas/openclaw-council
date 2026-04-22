@@ -1,11 +1,33 @@
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
-import { Type } from "@sinclair/typebox";
 
-const CouncilMode = Type.Union([
-  Type.Literal("standard"),
-  Type.Literal("live"),
-  Type.Literal("research"),
-]);
+/** JSON Schema for tool parameters (no @sinclair/typebox — OpenClaw loads this file without plugin node_modules). */
+const councilRunParameters = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    topic: {
+      type: "string",
+      description: "Question or decision to deliberate.",
+    },
+    mode: {
+      type: "string",
+      enum: ["standard", "live", "research"],
+    },
+    rounds: {
+      type: "integer",
+      minimum: 1,
+      maximum: 8,
+      description: "Subagent turns (sequential).",
+    },
+  },
+  required: ["topic", "mode"],
+} as const;
+
+type CouncilRunParams = {
+  topic: string;
+  mode: "standard" | "live" | "research";
+  rounds?: number;
+};
 
 function extractAssistantText(messages: unknown): string {
   if (!Array.isArray(messages)) {
@@ -67,14 +89,8 @@ export default definePluginEntry({
         description:
           "Run a short council-style deliberation for a topic using a background subagent turn. " +
           "Returns assistant text from the subagent session (MVP; persist transcript via CLI separately).",
-        parameters: Type.Object({
-          topic: Type.String({ description: "Question or decision to deliberate." }),
-          mode: CouncilMode,
-          rounds: Type.Optional(
-            Type.Integer({ minimum: 1, maximum: 8, default: 1, description: "Subagent turns (sequential)." }),
-          ),
-        }),
-        async execute(_toolCallId, params) {
+        parameters: councilRunParameters,
+        async execute(_toolCallId, params: CouncilRunParams) {
           const sub = api.runtime.subagent;
           const timeoutMs = api.runtime.agent.resolveAgentTimeoutMs(api.config);
           const rounds = params.rounds ?? 1;
